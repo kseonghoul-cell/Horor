@@ -24,7 +24,7 @@
 </head>
 <body>
 <main id="loading"><div class="loader"><div class="spinner"></div><div>Loading...</div></div></main>
-<section id="scare" aria-label="Surprise"><img src="https://cdn.pixabay.com/photo/2022/10/05/22/24/halloween-7501614_1280.png" alt=""></section>
+<section id="scare" aria-label="Surprise"><img src="https://media1.tenor.com/m/cwGme6WoQCsAAAAd/hypergamy.gif" alt=""></section>
 <button id="stop" type="button">Stop</button><button id="replay" type="button">Replay</button>
 <script>
 (()=>{
@@ -54,24 +54,24 @@ function scream(at,second=false){
   osc.frequency.exponentialRampToValueAtTime(n===2?175:260,at+length*.78);
   osc.frequency.linearRampToValueAtTime(n===2?330:470,at+length);
   filter.type='bandpass';filter.frequency.value=n===0?1450:n===1?2350:900;filter.Q.value=n===2?1.4:2.8;
-  gain.gain.setValueAtTime(.0001,at);gain.gain.exponentialRampToValueAtTime(n===2?.075:.105,at+.018);
-  gain.gain.setValueAtTime(n===2?.075:.105,at+length*.52);gain.gain.exponentialRampToValueAtTime(.0001,at+length);
+  gain.gain.setValueAtTime(.0001,at);gain.gain.exponentialRampToValueAtTime(n===2?.105:.145,at+.018);
+  gain.gain.setValueAtTime(n===2?.105:.145,at+length*.52);gain.gain.exponentialRampToValueAtTime(.0001,at+length);
   osc.connect(filter);filter.connect(gain);gain.connect(master);osc.start(at);osc.stop(at+length+.02);
  });
- noiseBurst(at,.16,.16,'highpass',2600);
- noiseBurst(at+.03,.42,.095,'bandpass',1750);
+ noiseBurst(at,.19,.22,'highpass',2800);
+ noiseBurst(at+.03,.42,.13,'bandpass',1850);
 }
 function sting(){
  try{
   if(!ctx||ctx.state!=='running')return;
   const now=ctx.currentTime;master=ctx.createGain();
-  master.gain.setValueAtTime(.72,now);master.connect(ctx.destination);
+  master.gain.setValueAtTime(.82,now);master.connect(ctx.destination);
   // A sharp impact, a harsh layered shriek, then a shorter second shriek.
-  noiseBurst(now,.42,.42,'lowpass',180);
-  noiseBurst(now,.18,.24,'highpass',4200);
-  const sub=ctx.createOscillator(),subGain=ctx.createGain();sub.type='sine';sub.frequency.setValueAtTime(72,now);sub.frequency.exponentialRampToValueAtTime(34,now+.36);subGain.gain.setValueAtTime(.0001,now);subGain.gain.exponentialRampToValueAtTime(.34,now+.012);subGain.gain.exponentialRampToValueAtTime(.0001,now+.4);sub.connect(subGain);subGain.connect(master);sub.start(now);sub.stop(now+.42);
+  noiseBurst(now,.42,.48,'lowpass',165);
+  noiseBurst(now,.18,.30,'highpass',4400);
+  const sub=ctx.createOscillator(),subGain=ctx.createGain();sub.type='sine';sub.frequency.setValueAtTime(72,now);sub.frequency.exponentialRampToValueAtTime(34,now+.36);subGain.gain.setValueAtTime(.0001,now);subGain.gain.exponentialRampToValueAtTime(.42,now+.012);subGain.gain.exponentialRampToValueAtTime(.0001,now+.4);sub.connect(subGain);subGain.connect(master);sub.start(now);sub.stop(now+.42);
   scream(now+.015,false);scream(now+.34,true);
-  master.gain.setValueAtTime(.72,now+1.1);master.gain.linearRampToValueAtTime(.0001,now+1.65);
+  master.gain.setValueAtTime(.82,now+1.1);master.gain.linearRampToValueAtTime(.0001,now+1.65);
  }catch(e){}
 }
 function fire(){if(stopped)return;loading.style.display='none';scare.classList.add('show');sting();replay.classList.add('show')}
