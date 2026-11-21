@@ -8,12 +8,12 @@
 <title>Loading</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;color:#aaa;font-family:Arial,sans-serif}
-#loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000;transition:opacity .12s}
+#loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000}
 .loader{display:flex;flex-direction:column;align-items:center;gap:18px;color:#777;font-size:12px;letter-spacing:.22em;text-transform:uppercase}
 .spinner{width:22px;height:22px;border:1px solid #242424;border-top-color:#777;border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 #scare{position:fixed;inset:0;display:none;background:#000;z-index:5}
-#scare.show{display:block;animation:slam .13s steps(2,end)}
+#scare.show{display:block;animation:slam .12s steps(2,end)}
 #scare img{width:100%;height:100%;object-fit:cover;object-position:center}
 @keyframes slam{0%{transform:scale(1.22);filter:brightness(5)}100%{transform:scale(1);filter:brightness(1)}}
 #stop{position:fixed;z-index:9;right:12px;top:12px;border:1px solid #444;background:#080808;color:#aaa;padding:9px 12px;border-radius:3px;font:11px Arial;opacity:.18}
@@ -24,28 +24,60 @@
 </head>
 <body>
 <main id="loading"><div class="loader"><div class="spinner"></div><div>Loading...</div></div></main>
-<section id="scare" aria-label="Surprise">
-<img src="https://cdn.pixabay.com/photo/2022/10/05/22/24/halloween-7501614_1280.png" alt="">
-</section>
-<button id="stop" type="button">Stop</button>
-<button id="replay" type="button">Replay</button>
+<section id="scare" aria-label="Surprise"><img src="https://cdn.pixabay.com/photo/2022/10/05/22/24/halloween-7501614_1280.png" alt=""></section>
+<button id="stop" type="button">Stop</button><button id="replay" type="button">Replay</button>
 <script>
 (()=>{
 const loading=document.getElementById('loading'),scare=document.getElementById('scare'),stop=document.getElementById('stop'),replay=document.getElementById('replay');
-let timer=null,ctx=null,stopped=false;
+let timer=null,ctx=null,master=null,stopped=false,audioUnlocked=false;
+function unlockAudio(){
+ if(audioUnlocked)return;audioUnlocked=true;
+ try{const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;ctx=new AC();if(ctx.state==='suspended')ctx.resume().catch(()=>{});}catch(e){}
+}
+document.addEventListener('pointerdown',unlockAudio,{once:true,capture:true});
+document.addEventListener('keydown',unlockAudio,{once:true,capture:true});
+function noiseBurst(at,duration,volume,filterType,frequency){
+ const size=Math.ceil(ctx.sampleRate*duration),buffer=ctx.createBuffer(1,size,ctx.sampleRate),data=buffer.getChannelData(0);
+ for(let i=0;i<size;i++){const fade=Math.min(1,i/(ctx.sampleRate*.006))*Math.min(1,(size-i)/(ctx.sampleRate*.06));data[i]=(Math.random()*2-1)*fade;}
+ const src=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),gain=ctx.createGain();
+ src.buffer=buffer;filter.type=filterType;filter.frequency.setValueAtTime(frequency,at);filter.Q.value=1.2;
+ gain.gain.setValueAtTime(volume,at);gain.gain.exponentialRampToValueAtTime(.0001,at+duration);
+ src.connect(filter);filter.connect(gain);gain.connect(master);src.start(at);src.stop(at+duration);
+}
+function scream(at,second=false){
+ const length=second?.72:1.05;
+ [0,1,2].forEach((n)=>{
+  const osc=ctx.createOscillator(),gain=ctx.createGain(),filter=ctx.createBiquadFilter();
+  osc.type=n===2?'sawtooth':'triangle';
+  const startHz=(n===0?780:n===1?1160:520)*(second?.88:1);
+  osc.frequency.setValueAtTime(startHz,at);
+  osc.frequency.exponentialRampToValueAtTime(n===2?175:260,at+length*.78);
+  osc.frequency.linearRampToValueAtTime(n===2?330:470,at+length);
+  filter.type='bandpass';filter.frequency.value=n===0?1450:n===1?2350:900;filter.Q.value=n===2?1.4:2.8;
+  gain.gain.setValueAtTime(.0001,at);gain.gain.exponentialRampToValueAtTime(n===2?.075:.105,at+.018);
+  gain.gain.setValueAtTime(n===2?.075:.105,at+length*.52);gain.gain.exponentialRampToValueAtTime(.0001,at+length);
+  osc.connect(filter);filter.connect(gain);gain.connect(master);osc.start(at);osc.stop(at+length+.02);
+ });
+ noiseBurst(at,.16,.16,'highpass',2600);
+ noiseBurst(at+.03,.42,.095,'bandpass',1750);
+}
 function sting(){
  try{
-  const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
-  ctx=new AC();if(ctx.state==='suspended')ctx.resume().catch(()=>{});
-  const now=ctx.currentTime,master=ctx.createGain();
-  master.gain.setValueAtTime(.0001,now);master.gain.exponentialRampToValueAtTime(.2,now+.018);master.gain.exponentialRampToValueAtTime(.0001,now+.85);master.connect(ctx.destination);
-  [95,142,211,880].forEach((f,i)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type=i===3?'sawtooth':'triangle';o.frequency.setValueAtTime(f,now);o.frequency.exponentialRampToValueAtTime(f*.58,now+.65);g.gain.value=i===3?.12:.5;o.connect(g);g.connect(master);o.start(now);o.stop(now+.86)});
+  if(!ctx||ctx.state!=='running')return;
+  const now=ctx.currentTime;master=ctx.createGain();
+  master.gain.setValueAtTime(.72,now);master.connect(ctx.destination);
+  // A sharp impact, a harsh layered shriek, then a shorter second shriek.
+  noiseBurst(now,.42,.42,'lowpass',180);
+  noiseBurst(now,.18,.24,'highpass',4200);
+  const sub=ctx.createOscillator(),subGain=ctx.createGain();sub.type='sine';sub.frequency.setValueAtTime(72,now);sub.frequency.exponentialRampToValueAtTime(34,now+.36);subGain.gain.setValueAtTime(.0001,now);subGain.gain.exponentialRampToValueAtTime(.34,now+.012);subGain.gain.exponentialRampToValueAtTime(.0001,now+.4);sub.connect(subGain);subGain.connect(master);sub.start(now);sub.stop(now+.42);
+  scream(now+.015,false);scream(now+.34,true);
+  master.gain.setValueAtTime(.72,now+1.1);master.gain.linearRampToValueAtTime(.0001,now+1.65);
  }catch(e){}
 }
 function fire(){if(stopped)return;loading.style.display='none';scare.classList.add('show');sting();replay.classList.add('show')}
 function start(){stopped=false;replay.classList.remove('show');scare.classList.remove('show');loading.style.display='flex';clearTimeout(timer);timer=setTimeout(fire,5200+Math.random()*2200)}
-function halt(){stopped=true;clearTimeout(timer);if(ctx){ctx.close().catch(()=>{});ctx=null}scare.classList.remove('show');loading.style.display='flex';replay.classList.remove('show')}
-stop.addEventListener('click',halt);replay.addEventListener('click',start);document.addEventListener('keydown',e=>{if(e.key==='Escape')halt()});start();
+function halt(){stopped=true;clearTimeout(timer);if(master){try{master.gain.cancelScheduledValues(ctx.currentTime);master.gain.setTargetAtTime(.0001,ctx.currentTime,.015)}catch(e){}}scare.classList.remove('show');loading.style.display='flex';replay.classList.remove('show')}
+stop.addEventListener('click',halt);replay.addEventListener('click',()=>{unlockAudio();start()});document.addEventListener('keydown',e=>{if(e.key==='Escape')halt()});start();
 })();
 </script>
 </body>
